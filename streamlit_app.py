@@ -7,12 +7,31 @@ st.navigation / st.Page 로 홈 + 데모 10개를 하나의 앱으로 묶는다.
 
 import streamlit as st
 
+from utils.theme import inject_css
+
 st.set_page_config(
     page_title="Streamlit 쇼케이스 · Woka",
     page_icon="🎈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+inject_css()
+
+with st.sidebar:
+    st.markdown(
+        """
+        <div style="padding:6px 4px 12px;">
+          <div style="font-size:19px;font-weight:700;color:#1f2430;letter-spacing:-0.02em;">
+            🎈 Streamlit 쇼케이스
+          </div>
+          <div style="font-size:12.5px;color:#6b7280;margin-top:2px;">
+            파이썬으로 만든 데이터 웹앱 10선
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 pages = {
     "시작": [

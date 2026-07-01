@@ -7,64 +7,99 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from utils.ui import feature_note, footer
+from utils.sample_data import review_sample
+from utils.theme import ORANGE, style_fig
+from utils.ui import feature_note, footer, page_header, section
 
-st.title("✍️ 텍스트 분석기")
-st.caption("글을 입력하면 글자·단어·문장 수와 빈출 단어가 즉시 갱신됩니다. 입력하는 동안 실시간 분석합니다.")
+page_header("✍️", "텍스트 분석기", "입력하는 즉시 통계와 빈출 단어가 갱신")
 
-SAMPLE = (
-    "Streamlit은 파이썬만으로 데이터 웹앱을 만드는 도구입니다. "
-    "복잡한 프런트엔드 지식 없이도 대시보드와 챗봇, 시각화 앱을 빠르게 만들 수 있습니다. "
-    "코드를 저장하면 화면이 자동으로 갱신되고, 배포도 무료로 할 수 있습니다."
-)
+STOP = {
+    "은", "는", "이", "가", "을", "를", "에", "의", "도", "으로", "와", "과",
+    "고", "라", "만", "에서", "에게", "한", "그", "저", "것", "수", "때",
+    "and", "the", "to", "of", "a", "in", "is", "for", "on",
+}
 
-text = st.text_area("분석할 텍스트", value=SAMPLE, height=180)
 
-# ── 기본 지표 ─────────────────────────────
-chars = len(text)
-chars_no_space = len(text.replace(" ", "").replace("\n", ""))
-words = re.findall(r"[가-힣A-Za-z0-9]+", text)
-sentences = [s for s in re.split(r"[.!?。\n]", text) if s.strip()]
-reading_sec = int(len(words) / 200 * 60)  # 분당 200단어 기준
+def analyze(text: str):
+    """텍스트에서 기본 지표와 정제된 토큰을 계산한다."""
+    chars = len(text)
+    chars_no_space = len(re.sub(r"\s", "", text))
+    tokens = re.findall(r"[가-힣A-Za-z0-9]+", text)
+    sentences = [s for s in re.split(r"[.!?。\n]", text) if s.strip()]
+    meaningful = [w.lower() for w in tokens if len(w) >= 2 and w.lower() not in STOP]
+    return chars, chars_no_space, tokens, sentences, meaningful
 
+
+with st.container(border=True):
+    text = st.text_area(
+        "분석할 텍스트",
+        value=review_sample(),
+        height=200,
+        help="글을 수정하면 아래 지표와 차트가 즉시 다시 계산됩니다.",
+    )
+
+if not text.strip():
+    st.info("분석할 텍스트를 입력해 주세요.")
+    footer()
+    st.stop()
+
+chars, chars_no_space, tokens, sentences, meaningful = analyze(text)
+reading_min = len(tokens) / 200  # 분당 200단어 기준
+
+section("기본 지표")
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("글자 수", f"{chars:,}")
-c2.metric("공백 제외", f"{chars_no_space:,}")
-c3.metric("단어 수", f"{len(words):,}")
+c2.metric("공백 제외", f"{chars_no_space:,}", delta=f"공백 {chars - chars_no_space:,}자")
+c3.metric("단어 수", f"{len(tokens):,}")
 c4.metric("문장 수", f"{len(sentences):,}")
 
-st.caption(f"예상 읽기 시간: 약 {reading_sec}초 (분당 200단어 기준)")
+if reading_min < 1:
+    read_label = f"약 {int(reading_min * 60)}초"
+else:
+    read_label = f"약 {reading_min:.1f}분"
+st.caption(f"예상 읽기 시간: {read_label} (분당 200단어 기준)")
 
-st.divider()
-
-# ── 빈출 단어 ─────────────────────────────
-STOP = {"은", "는", "이", "가", "을", "를", "에", "의", "도", "으로", "and", "the", "to", "of"}
-meaningful = [w.lower() for w in words if len(w) > 1 and w.lower() not in STOP]
-
+section("빈출 단어")
 if meaningful:
     top = Counter(meaningful).most_common(15)
     freq = pd.DataFrame(top, columns=["단어", "빈도"])
-    tab1, tab2 = st.tabs(["빈출 단어 차트", "빈도 표"])
-    with tab1:
-        fig = px.bar(freq, x="빈도", y="단어", orientation="h")
-        fig.update_traces(marker_color="#ff6c00")
-        fig.update_layout(
-            margin=dict(l=0, r=0, t=10, b=0), height=420,
-            yaxis={"categoryorder": "total ascending"},
-        )
+    freq.insert(0, "순위", range(1, len(freq) + 1))
+
+    tab_chart, tab_table = st.tabs(["차트", "빈도표"])
+    with tab_chart:
+        fig = px.bar(freq, x="빈도", y="단어", orientation="h", text="빈도")
+        fig.update_traces(marker_color=ORANGE, textposition="outside", cliponaxis=False)
+        fig.update_layout(yaxis={"categoryorder": "total ascending"})
+        fig = style_fig(fig, height=460, legend=False)
+        fig.update_xaxes(title_text="")
+        fig.update_yaxes(title_text="")
         st.plotly_chart(fig, width="stretch")
-    with tab2:
-        st.dataframe(freq, width="stretch", height=420)
+    with tab_table:
+        st.dataframe(
+            freq,
+            width="stretch",
+            hide_index=True,
+            height=460,
+            column_config={
+                "빈도": st.column_config.ProgressColumn(
+                    "빈도",
+                    format="%d",
+                    min_value=0,
+                    max_value=int(freq["빈도"].max()),
+                ),
+            },
+        )
 else:
-    st.info("분석할 단어가 없습니다. 텍스트를 입력해 주세요.")
+    st.info("불용어를 제외하고 나면 집계할 단어가 없습니다.")
 
 feature_note(
     "텍스트 분석기",
     [
-        "`st.text_area`: 입력이 바뀔 때마다 아래 지표·차트가 즉시 재계산",
-        "`st.metric` 4열로 핵심 수치를 한눈에 배치",
-        "`st.tabs`: 같은 결과를 차트/표 탭으로 나눠 제공",
-        "표준 파이썬(정규식·Counter)만으로 분석 로직 구현",
+        "`st.text_area`: 입력이 바뀔 때마다 지표·차트가 즉시 재계산",
+        "`st.metric` 4열로 핵심 수치를 카드로 배치, delta 로 공백 수 표기",
+        "`st.tabs`: 같은 결과를 차트/빈도표로 분리 제공",
+        "`st.column_config.ProgressColumn`: 표 안에서 빈도를 막대로 시각화",
+        "표준 파이썬(정규식·Counter)만으로 토큰화·불용어 제거 구현",
     ],
 )
 footer()
