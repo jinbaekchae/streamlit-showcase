@@ -72,7 +72,7 @@ footer { visibility: hidden; }
   padding: 14px 16px; box-shadow: 0 1px 2px rgba(16,24,40,0.04);
 }
 [data-testid="stMetricLabel"] p { color: #6b7280; font-weight: 500; }
-[data-testid="stMetricValue"] { font-weight: 700; letter-spacing: -0.02em; }
+[data-testid="stMetricValue"] { font-weight: 700; letter-spacing: -0.03em; font-size: 1.65rem; }
 
 /* 버튼 */
 .stButton > button, .stDownloadButton > button, .stFormSubmitButton > button {
@@ -116,9 +116,11 @@ def inject_css() -> None:
 
 def style_fig(fig, height: int = 340, legend: bool = True, show_ygrid: bool = True):
     """모든 Plotly 차트에 공통 스타일(폰트·색·여백)을 입힌다."""
+    # 제목 텍스트가 없는 figure 에 title 객체(폰트 포함)를 만들면 'undefined' 가
+    # 표시되므로, style_fig 는 title 을 건드리지 않는다. 제목이 필요한 차트는
+    # px(title=...) 로 직접 지정한다(그 경우 title.text 가 있어 정상 표시됨).
     fig.update_layout(
         font=dict(family="Pretendard, sans-serif", size=13, color=INK),
-        title=dict(font=dict(size=15, color=INK)),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(l=8, r=8, t=34, b=8),
